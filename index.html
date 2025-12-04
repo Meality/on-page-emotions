@@ -14,7 +14,7 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            overflow: hidden; /* Empêche le scroll sur PC */
+            overflow: hidden; /* Empêche le scroll global sur Desktop */
             position: relative;
         }
 
@@ -54,7 +54,8 @@
             justify-content: center;
             align-items: center;
             position: relative;
-            min-height: 0; /* Important pour le flex shrink */
+            /* La hauteur est gérée dynamiquement par le JS et le flex container */
+            overflow: hidden; 
         }
 
         #info-column {
@@ -74,7 +75,7 @@
             border-radius: 12px;
             padding: 15px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.03);
-            flex-shrink: 0; /* Empêche l'écrasement */
+            flex-shrink: 0;
         }
 
         h2 {
@@ -115,7 +116,6 @@
             font-style: italic;
         }
         
-        /* Styles des boites conseils */
         .advice-box {
             padding: 10px;
             border-radius: 6px;
@@ -179,31 +179,36 @@
         /* --- MOBILE RESPONSIVE --- */
         @media (max-width: 900px) {
             body {
-                height: auto;
-                overflow-y: auto;
-                padding: 10px 0;
-                display: block;
+                height: 100vh; /* Garde la hauteur viewport */
+                overflow: hidden; 
+                padding: 0;
+                display: flex;
+                flex-direction: column;
             }
             #main-layout {
                 flex-direction: column;
                 width: 100%;
-                height: auto;
+                height: 100%;
                 box-shadow: none;
                 padding: 10px;
                 border-radius: 0;
+                gap: 10px;
             }
             #chart-column {
-                min-height: 400px;
-                margin-bottom: 20px;
+                flex: 0 0 auto; /* Ne pas grandir indéfiniment */
+                height: 45vh; /* Limite la hauteur de la roue à 45% de l'écran */
+                min-height: 0;
+                width: 100%;
             }
             #info-column {
-                min-width: 100%;
-                overflow: visible;
+                flex: 1; /* Prend le reste de la place */
+                width: 100%;
+                overflow-y: auto;
+                padding-bottom: 20px;
             }
             #lang-container {
-                position: relative;
-                top: 0; left: 0;
-                margin: 0 0 10px 10px;
+                position: absolute;
+                top: 10px; left: 10px;
             }
         }
     </style>
@@ -276,7 +281,7 @@
 
 <script>
     // ==========================================
-    // 1. DATASETS (FR & EN) - Enrichis avec "self"
+    // 1. DATASETS (FR & EN)
     // ==========================================
 
     const rawDataFr = {
@@ -698,13 +703,16 @@
         // Clear previous chart
         d3.select("#chart-column").selectAll("*").remove();
 
-        // Responsive Dimensions
+        // Responsive Dimensions Calculation
+        // Limit calculation based on visible window to prevent overflow
         const chartDiv = document.getElementById('chart-column');
-        const containerWidth = chartDiv.clientWidth;
-        const containerHeight = chartDiv.clientHeight;
+        const availableWidth = chartDiv.clientWidth;
         
-        // Use the smaller dimension to keep it circular and contained
-        const size = Math.min(containerWidth, containerHeight, 700); 
+        // Use window innerHeight to ensure it fits the screen height
+        // We take 90% of the smallest dimension to keep it contained
+        const maxScreenSize = Math.min(window.innerWidth, window.innerHeight) * 0.9;
+        const size = Math.min(availableWidth, maxScreenSize, 700); 
+
         const radius = size / 6;
 
         const hierarchy = d3.hierarchy(data)
@@ -727,7 +735,7 @@
             .append("svg")
             .attr("viewBox", [-size / 2, -size / 2, size, size])
             .style("max-width", "100%")
-            .style("height", "auto")
+            .style("max-height", "100%") // Ensure it respects container height
             .style("font", "10px sans-serif");
 
         const getColor = (d) => {
@@ -768,17 +776,17 @@
             })
             .text(d => d.data.name);
 
-        // Events
+        // Elements for panel update
         const dynamicPanel = document.getElementById('dynamic-panel');
         const defaultMsg = document.getElementById('default-msg');
         const details = document.getElementById('details');
-        
         const titleEl = document.getElementById('emotion-title');
         const defEl = document.getElementById('emotion-def');
         const adviceEl = document.getElementById('emotion-advice');
         const selfAdviceEl = document.getElementById('emotion-self-advice');
 
-        path.on("mouseenter", function(event, d) {
+        // Logic to update the panel (Factored out to be used by click or hover)
+        const updatePanel = function(event, d) {
             d3.selectAll("path").style("opacity", 0.3);
             const sequence = d.ancestors().reverse();
             svg.selectAll("path")
@@ -788,7 +796,9 @@
             defaultMsg.style.display = 'none';
             details.style.display = 'block';
             
-            let activeColor = d3.select(this).attr("fill");
+            // For click event, we need to select element differently than hover 'this' context in some d3 versions,
+            // but here we use the data 'd' directly for content and event target for style.
+            let activeColor = getColor(d); 
             dynamicPanel.style.borderLeftColor = activeColor;
             
             titleEl.textContent = d.data.name;
@@ -802,12 +812,32 @@
             defEl.textContent = d.data.definition || fallbackDef;
             adviceEl.textContent = d.data.advice || fallbackAdv;
             selfAdviceEl.textContent = d.data.self || fallbackSelf;
-        });
+        };
 
-        d3.select("#chart-column").on("mouseleave", function() {
+        const resetView = function() {
             d3.selectAll("path").style("opacity", 1);
             resetPanel();
-        });
+        };
+
+        // EVENT LISTENER LOGIC
+        // Detect Mobile Width (< 900px matching CSS)
+        const isMobile = window.innerWidth <= 900;
+
+        if (isMobile) {
+            // MOBILE: CLICK ONLY
+            path.on("click", function(event, d) {
+                event.stopPropagation(); // Prevent bubbling to svg
+                updatePanel(event, d);
+            });
+            // Click on background to reset
+            svg.on("click", function() {
+                resetView();
+            });
+        } else {
+            // DESKTOP: HOVER
+            path.on("mouseenter", updatePanel);
+            d3.select("#chart-column").on("mouseleave", resetView);
+        }
     }
 
     // Handle Resize for Responsiveness
