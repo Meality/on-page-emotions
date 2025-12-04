@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roue des Émotions & Outils Relationnels</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden; /* Empêche le scroll sur PC */
+            position: relative;
+        }
+
+        /* Langue Switcher */
+        #lang-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+        }
+        select {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            background: rgba(255,255,255,0.95);
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #main-layout {
+            display: flex;
+            flex-direction: row;
+            width: 95%;
+            height: 92%;
+            gap: 20px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.08);
+            box-sizing: border-box;
+        }
+
+        #chart-column {
+            flex: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            min-height: 0; /* Important pour le flex shrink */
+        }
+
+        #info-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto; /* Scroll uniquement dans la colonne info */
+            padding-right: 5px;
+            min-width: 320px;
+            font-size: 0.85rem;
+        }
+
+        .card {
+            background: #f9fbfd;
+            border: 1px solid #e1e4e8;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            flex-shrink: 0; /* Empêche l'écrasement */
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 1rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        /* Panneau Détail Emotion */
+        #dynamic-panel {
+            border-left: 6px solid #ccc;
+            min-height: 200px;
+            transition: border-color 0.3s;
+        }
+        .label {
+            font-weight: bold;
+            font-size: 0.7rem;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            margin-top: 12px;
+            display: block;
+            margin-bottom: 2px;
+        }
+        #emotion-title { 
+            font-size: 1.6rem;
+            margin-bottom: 5px; 
+            color: #333; 
+            text-transform: capitalize; 
+            font-weight: 700;
+        }
+        #emotion-def {
+            font-size: 0.95rem;
+            line-height: 1.4;
+            color: #555;
+            font-style: italic;
+        }
+        
+        /* Styles des boites conseils */
+        .advice-box {
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .placeholder { color: #aaa; font-style: italic; text-align: center; margin-top: 40px; }
+
+        /* Panneau Défense */
+        #defense-panel {
+            background-color: #fff5f5;
+            border-left: 6px solid #e74c3c;
+        }
+        .defense-list { list-style: none; padding: 0; margin: 0; }
+        .defense-list li { margin-bottom: 6px; font-weight: bold; color: #555; font-size: 0.85rem; }
+        .defense-tag { 
+            display: inline-block; width: 55px;
+            color: #fff; background: #333; 
+            text-align: center; border-radius: 4px; 
+            font-size: 0.7rem;
+            margin-right: 8px; padding: 2px 0;
+        }
+        .brain-note {
+            margin-top: 10px;
+            background: #fff;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            border-left: 3px solid #e74c3c;
+            color: #444;
+            font-style: italic;
+            line-height: 1.3;
+        }
+
+        /* Panneau Feedback */
+        #feedback-panel {
+            background-color: #f0fdf4;
+            border-left: 6px solid #00b050;
+        }
+        .step-row { display: flex; margin-bottom: 10px; align-items: flex-start; }
+        .step-letter {
+            font-weight: bold; 
+            font-size: 1rem;
+            color: #00b050; 
+            margin-right: 8px; min-width: 20px;
+        }
+        .step-content { 
+            font-size: 0.8rem;
+            color: #333; 
+            line-height: 1.3; 
+        }
+        .step-content u { text-decoration-color: #00b050; text-decoration-thickness: 2px; }
+        .example { display: block; color: #666; font-size: 0.75rem; margin-top: 2px; font-style: italic; }
+
+        /* SVG */
+        path { cursor: pointer; stroke: #fff; stroke-width: 0.5px; transition: opacity 0.2s; }
+        path:hover { opacity: 0.8; }
+        text { pointer-events: none; text-anchor: middle; font-family: sans-serif; font-weight: bold; text-shadow: 0 0 3px rgba(255,255,255,0.4); }
+
+        /* --- MOBILE RESPONSIVE --- */
+        @media (max-width: 900px) {
+            body {
+                height: auto;
+                overflow-y: auto;
+                padding: 10px 0;
+                display: block;
+            }
+            #main-layout {
+                flex-direction: column;
+                width: 100%;
+                height: auto;
+                box-shadow: none;
+                padding: 10px;
+                border-radius: 0;
+            }
+            #chart-column {
+                min-height: 400px;
+                margin-bottom: 20px;
+            }
+            #info-column {
+                min-width: 100%;
+                overflow: visible;
+            }
+            #lang-container {
+                position: relative;
+                top: 0; left: 0;
+                margin: 0 0 10px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="lang-container">
+    <select id="lang-select" onchange="changeLanguage(this.value)">
+        <option value="fr">Français</option>
+        <option value="en">English</option>
+    </select>
+</div>
+
+<div id="main-layout">
+    <div id="chart-column"></div>
+
+    <div id="info-column">
+        
+        <div id="dynamic-panel" class="card">
+            <div id="default-msg" class="placeholder"></div>
+            <div id="details" style="display: none;">
+                <div id="emotion-title"></div>
+                <span id="lbl-definition" class="label"></span>
+                <div id="emotion-def"></div>
+
+                <span id="lbl-self-advice" class="label"></span>
+                <div id="emotion-self-advice" class="advice-box" style="background:#e3f2fd; color:#0d47a1;"></div>
+
+                <span id="lbl-advice" class="label"></span>
+                <div id="emotion-advice" class="advice-box" style="background:#f5f5f5; color:#333;"></div>
+            </div>
+        </div>
+
+        <div id="defense-panel" class="card">
+            <h2 id="title-defense"></h2>
+            <ul class="defense-list">
+                <li><span class="defense-tag" style="background:#e74c3c;">Fight</span> <span id="def-fight"></span></li>
+                <li><span class="defense-tag" style="background:#f1c40f; color:#333;">Flight</span> <span id="def-flight"></span></li>
+                <li><span class="defense-tag" style="background:#3498db;">Freeze</span> <span id="def-freeze"></span></li>
+            </ul>
+            <div class="brain-note" id="brain-note"></div>
+        </div>
+
+        <div id="feedback-panel" class="card">
+            <h2 id="title-feedback"></h2>
+            
+            <div class="step-row">
+                <div class="step-letter">A</div>
+                <div class="step-content" id="fb-step-a"></div>
+            </div>
+
+            <div class="step-row">
+                <div class="step-letter">B</div>
+                <div class="step-content" id="fb-step-b"></div>
+            </div>
+
+            <div class="step-row">
+                <div class="step-letter">C</div>
+                <div class="step-content" id="fb-step-c"></div>
+            </div>
+
+            <div class="step-row">
+                <div class="step-letter">D</div>
+                <div class="step-content" id="fb-step-d"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 1. DATASETS (FR & EN) - Enrichis avec "self"
+    // ==========================================
+
+    const rawDataFr = {
+        "name": "Emotions", "color": "#ffffff", "children": [
+            { "name": "Colère", "color": "#e74c3c", "definition": "Réaction vive face à une frustration ou une menace.", "advice": "Ne répondez pas par l'agressivité. Écoutez sans interrompre.", "self": "Prenez une pause (Stop). Ne réagissez pas à chaud. Respirez pour faire baisser la tension.", "children": [
+                { "name": "Blessé", "definition": "Souffrance transformée en hostilité.", "advice": "Adressez-vous à la douleur cachée derrière la colère.", "self": "Reconnaissez que vous avez mal. Ne masquez pas votre peine par de l'attaque.", "children": [
+                    { "name": "Embarassé", "definition": "Gêne intense ou honte exposée.", "advice": "Ne pas insister sur la faute. Rassurer sur la valeur.", "self": "Soyez bienveillant avec vous-même. L'erreur est humaine." },
+                    { "name": "Dévasté", "definition": "Choc émotionnel suite à un trauma.", "advice": "Offrir une présence calme et stable.", "self": "Cherchez un lieu sûr. Demandez du soutien immédiatement." }
+                ]},
+                { "name": "Menacé", "definition": "Défense face à un danger perçu.", "advice": "Rétablissez un sentiment de sécurité.", "self": "Vérifiez : le danger est-il réel ou supposé ? Cherchez vos appuis.", "children": [
+                    { "name": "Insécure", "definition": "Manque de confiance face à l'instabilité.", "advice": "Créer un environnement prévisible.", "self": "Listez vos compétences et vos réussites passées pour vous rassurer." },
+                    { "name": "Jaloux", "definition": "Crainte de perdre un lien ou un avantage.", "advice": "Rassurer sur l'importance de la relation unique.", "self": "Exprimez votre besoin d'attention sans accuser l'autre." }
+                ]},
+                { "name": "Haineux", "definition": "Hostilité profonde et durable.", "advice": "Posez des limites fermes sans le prendre personnellement.", "self": "La haine vous empoisonne plus que l'autre. Cherchez à lâcher prise pour votre bien.", "children": [
+                    { "name": "Amer", "definition": "Rancœur persistante d'injustices passées.", "advice": "Reconnaître le passé, mais inviter à agir au présent.", "self": "Écrivez ce que vous ne pouvez pas pardonner, puis brûlez le papier." },
+                    { "name": "Défiant", "definition": "Opposition active à l'autorité.", "advice": "Offrir des choix pour redonner du contrôle.", "self": "Choisissez vos batailles. Cette lutte en vaut-elle vraiment la peine ?" }
+                ]},
+                { "name": "En colère", "definition": "État d'irritation active.", "advice": "Laissez l'orage passer.", "self": "Dites 'Je suis en colère' et sortez marcher 5 minutes.", "children": [
+                    { "name": "Furieux", "definition": "Agitation extrême et explosive.", "advice": "Garder ses distances, attendre le calme.", "self": "Éloignez-vous physiquement pour ne rien casser (ni objets, ni relations)." },
+                    { "name": "Enragé", "definition": "Perte de contrôle totale.", "advice": "Prioriser la sécurité. Rompre le contact temporairement.", "self": "Urgence : isolez-vous. Respirez profondément en comptant jusqu'à 10." }
+                ]},
+                { "name": "Agressif", "definition": "Passage à l'acte verbal ou physique.", "advice": "Sécurisez l'espace. Soyez ferme.", "self": "Canalisez cette énergie dans une activité physique intense.", "children": [
+                    { "name": "Provocant", "definition": "Cherche à susciter une réaction hostile.", "advice": "Ne pas mordre à l'hameçon. Répondre aux faits.", "self": "Demandez-vous : quel besoin d'attention essayez-vous de combler ?" },
+                    { "name": "Hostile", "definition": "Attitude d'inimitié déclarée.", "advice": "Poser des limites claires sans agressivité.", "self": "Essayez de voir l'humanité chez l'autre personne." }
+                ]},
+                { "name": "Frustré", "definition": "Tension due à l'impossibilité d'agir.", "advice": "Cherchez une alternative à l'obstacle.", "self": "Acceptez que tout ne soit pas sous votre contrôle. Changez d'angle.", "children": [
+                    { "name": "Furieux", "definition": "Exaspération face à un obstacle répété.", "advice": "Proposer une méthode alternative.", "self": "Faites une pause radicale. Revenez au problème plus tard." },
+                    { "name": "Irrité", "definition": "Agacement causé par une situation désagréable.", "advice": "Réduire les stimuli (bruit, pression).", "self": "Identifiez le caillou dans la chaussure et retirez-le." }
+                ]},
+                { "name": "Distant", "definition": "Rupture du lien émotionnel.", "advice": "Respectez la distance tout en restant disponible.", "self": "Prenez ce temps pour vous recharger, mais donnez une échéance de retour.", "children": [
+                    { "name": "Retiré", "definition": "Repli sur soi pour se protéger.", "advice": "Respecter le besoin de silence.", "self": "Profitez de la solitude pour faire le tri dans vos pensées." },
+                    { "name": "Suspect", "definition": "Méfiance envers les intentions d'autrui.", "advice": "Être transparent et constant.", "self": "Cherchez des preuves factuelles avant de juger les intentions." }
+                ]},
+                { "name": "Critique", "definition": "Attitude de jugement négatif.", "advice": "Demandez des précisions factuelles.", "self": "Tournez votre regard critique vers la solution, pas vers la personne.", "children": [
+                    { "name": "Sceptique", "definition": "Doute sur la véracité.", "advice": "Apporter des données concrètes et logiques.", "self": "Restez ouvert à la possibilité d'être surpris." },
+                    { "name": "Sarcastique", "definition": "Ironie mordante exprimant le mépris.", "advice": "Répondre au message sérieux sous-jacent.", "self": "Dites ce que vous pensez vraiment, sans le masque de l'humour." }
+                ]}
+            ]},
+            { "name": "Dégoût", "color": "#27ae60", "definition": "Rejet de ce qui est perçu comme nocif.", "advice": "Ne forcez pas l'acceptation. Validez le rejet.", "self": "Écoutez votre corps. Si c'est 'non', c'est 'non'.", "children": [
+                { "name": "Réprobation", "definition": "Désapprobation ferme.", "advice": "Écoutez les critères de jugement.", "self": "Clarifiez quelle valeur personnelle a été heurtée.", "children": [
+                    { "name": "Jugement", "definition": "Évaluation morale négative.", "advice": "Ramener la discussion à des faits observables.", "self": "Essayez de comprendre le contexte de l'autre avant de condamner." },
+                    { "name": "Aversion", "definition": "Répulsion et désir d'éloignement.", "advice": "Ne pas forcer la proximité.", "self": "Respectez votre besoin d'espace." }
+                ]},
+                { "name": "Déception", "definition": "Réalité en deçà des attentes.", "advice": "Permettez l'expression de la déception.", "self": "Ajustez vos attentes pour le futur. Acceptez la réalité telle qu'elle est.", "children": [
+                    { "name": "Répugnant", "definition": "Dégoût profond physique ou moral.", "advice": "Éloigner la source du dégoût si possible.", "self": "Quittez la situation. Protégez votre intégrité." },
+                    { "name": "Révolté", "definition": "Indignation morale face à une injustice.", "advice": "S'allier dans l'indignation pour agir.", "self": "Transformez cette énergie en action constructive pour changer les choses." }
+                ]},
+                { "name": "Terrible", "definition": "Sentiment d'horreur.", "advice": "Offrez un changement de contexte immédiat.", "self": "Ancrez-vous dans le présent (respiration, toucher) pour ne pas paniquer.", "children": [
+                    { "name": "Dégoût", "definition": "Nausée physique ou psychologique.", "advice": "Proposer de l'air frais ou une pause.", "self": "Buvez de l'eau, respirez de l'air frais." },
+                    { "name": "Détestable", "definition": "Hostilité envers l'odieux.", "advice": "Écouter pour permettre la purge émotionnelle.", "self": "Ne gardez pas cela en vous, parlez-en à une personne de confiance." }
+                ]},
+                { "name": "Evitement", "definition": "Se soustraire à l'objet du dégoût.", "advice": "Facilitez le départ de la situation.", "self": "C'est ok de partir si la situation est toxique.", "children": [
+                    { "name": "Aversion", "definition": "Volonté active de fuir.", "advice": "Ne pas bloquer la sortie.", "self": "Mettez de la distance physique rapidement." },
+                    { "name": "Hésitant", "definition": "Incertitude et retenue.", "advice": "Encourager doucement, avancer pas à pas.", "self": "Ne vous forcez pas. Prenez le temps d'observer." }
+                ]}
+            ]},
+            { "name": "Tristesse", "color": "#3498db", "definition": "Douleur liée à une perte ou un manque.", "advice": "Empathie et présence. Ne pas 'remonter le moral' trop vite.", "self": "Accueillez la peine. Pleurer permet de libérer les hormones de stress.", "children": [
+                { "name": "Culpabilité", "definition": "Sentiment d'avoir commis une faute.", "advice": "Aider à distinguer la vraie responsabilité.", "self": "Demandez pardon si nécessaire, puis pardonnez-vous. L'autoflagellation ne sert à rien.", "children": [
+                    { "name": "Remords", "definition": "Douleur d'avoir mal agi.", "advice": "Encourager la réparation ou le pardon.", "self": "Quelle action concrète pouvez-vous faire pour réparer ?" },
+                    { "name": "Honteux", "definition": "Sentiment d'indignité.", "advice": "Dissocier l'acte de l'identité de la personne.", "self": "Vous n'êtes pas votre erreur. Vous valez mieux que ça." }
+                ]},
+                { "name": "Abandon", "definition": "Être laissé seul sans soutien.", "advice": "Montrez activement que vous êtes là.", "self": "Devenez votre propre meilleur ami. Prenez soin de vous (bain, lecture).", "children": [
+                    { "name": "Ignoré", "definition": "Absence d'attention reçue.", "advice": "Établir un contact visuel et écouter.", "self": "Exprimez : 'J'ai besoin d'être écouté'." },
+                    { "name": "Intimidé", "definition": "Peur face à une situation écrasante.", "advice": "Adoucir la voix, simplifier les enjeux.", "self": "Visualisez-vous fort et capable. Tenez-vous droit." }
+                ]},
+                { "name": "Désespoir", "definition": "Perte totale d'espoir.", "advice": "Soyez un pilier stable. Aide concrète.", "self": "Ne regardez pas la montagne, regardez juste le prochain pas.", "children": [
+                    { "name": "Impuissant", "definition": "Conviction de ne pas pouvoir agir.", "advice": "Chercher une 'micro-action' réalisable.", "self": "Faites une toute petite tâche (ex: faire la vaisselle) pour reprendre du pouvoir." },
+                    { "name": "Vulnérable", "definition": "État de fragilité sans défense.", "advice": "Offrir bienveillance inconditionnelle.", "self": "Acceptez d'être fragile temporairement. C'est humain." }
+                ]},
+                { "name": "Dépression", "definition": "Baisse de l'humeur et de l'énergie.", "advice": "Patience. Ne pas juger le manque d'énergie.", "self": "Soyez doux. Ne vous fixez aucun objectif élevé aujourd'hui.", "children": [
+                    { "name": "Inférieur", "definition": "Croyance d'être en dessous des autres.", "advice": "Lister factuellement les réussites passées.", "self": "Arrêtez les comparaisons sur les réseaux sociaux." },
+                    { "name": "Vide", "definition": "Absence d'émotion, perte de sens.", "advice": "Être présent silencieusement.", "self": "Reconnectez-vous aux sens : toucher, odeur, goût." }
+                ]},
+                { "name": "Solitude", "definition": "Douleur de l'isolement.", "advice": "Moments partagés sans pression.", "self": "Appelez un proche ou allez dans un lieu public (café, parc).", "children": [
+                    { "name": "Abandonné", "definition": "Laissé pour compte par ses proches.", "advice": "Verbaliser : 'Je suis là pour toi'.", "self": "Rappelez-vous ceux qui vous aiment, même s'ils sont loin." },
+                    { "name": "Isolé", "definition": "Manque de connexion sociale.", "advice": "Proposer une inclusion douce.", "self": "Faites un petit geste vers quelqu'un (sourire, message)." }
+                ]},
+                { "name": "Ennui", "definition": "Manque d'intérêt et de stimulation.", "advice": "Changement de cadre ou trouver du sens.", "self": "Explorez quelque chose de nouveau ou bougez votre corps.", "children": [
+                    { "name": "Amorphe", "definition": "Manque total d'énergie.", "advice": "Ne pas brusquer. Attendre.", "self": "Reposez-vous vraiment, sans écran." },
+                    { "name": "Indifférent", "definition": "Désintérêt pour le présent.", "advice": "Chercher ce qui a du sens pour la personne.", "self": "Demandez-vous : 'Qu'est-ce qui me ferait vibrer maintenant ?'" }
+                ]}
+            ]},
+            { "name": "Joie", "color": "#f1c40f", "definition": "État de satisfaction et de plaisir.", "advice": "Célébrez et ancrez ce sentiment !", "self": "Profitez ! Ancrez ce moment dans votre mémoire.", "children": [
+                { "name": "Optimiste", "definition": "Confiance positive en l'avenir.", "advice": "Nourrissez cet élan pour lancer des projets.", "self": "Notez vos idées maintenant, vous êtes créatif !", "children": [
+                    { "name": "Inspiré", "definition": "Élan créatif.", "advice": "Encourager le brainstorming.", "self": "Créez quelque chose, n'importe quoi, tout de suite." },
+                    { "name": "Ouvert", "definition": "Acceptation de la nouveauté.", "advice": "Proposer des changements.", "self": "Dites 'oui' à une opportunité aujourd'hui." }
+                ]},
+                { "name": "Intime", "definition": "Proximité chaleureuse.", "advice": "Profitez pour renforcer le lien.", "self": "Soyez authentique, laissez tomber le masque.", "children": [
+                    { "name": "Espiègle", "definition": "Envie de jouer.", "advice": "Utiliser l'humour.", "self": "Amusez-vous, ne prenez rien au sérieux." },
+                    { "name": "Sensible", "definition": "Ouverture émotionnelle douce.", "advice": "Parler avec le cœur.", "self": "Appréciez cette connexion fine avec l'autre ou la nature." }
+                ]},
+                { "name": "Paisible", "definition": "Sérénité et calme.", "advice": "Préservez cette ambiance.", "self": "Faites durer cet état par la respiration lente.", "children": [
+                    { "name": "Espoir", "definition": "Confiance sereine.", "advice": "Valider que 'tout ira bien'.", "self": "Cultivez cette vision positive." },
+                    { "name": "Aimant", "definition": "Chaleur envers autrui.", "advice": "Accueillir cette affection.", "self": "Exprimez votre gratitude ou votre amour." }
+                ]},
+                { "name": "Fort", "definition": "Puissance personnelle.", "advice": "Encouragez l'autonomie.", "self": "Utilisez cette force pour avancer sur un sujet difficile.", "children": [
+                    { "name": "Provocant", "definition": "Désir audacieux de challenger.", "advice": "Canaliser vers un projet ambitieux.", "self": "Challengez le statu quo de manière constructive." },
+                    { "name": "Courageux", "definition": "Capacité à affronter la peur.", "advice": "Valoriser la bravoure.", "self": "Foncez, c'est le moment d'agir." }
+                ]},
+                { "name": "Accepté", "definition": "Appartenance et validation.", "advice": "Renforcez l'intégration.", "self": "Savourez le sentiment d'être à votre place.", "children": [
+                    { "name": "Accompli", "definition": "Satisfaction du devoir accompli.", "advice": "Féliciter spécifiquement.", "self": "Prenez un moment pour vous dire 'Bravo'." },
+                    { "name": "Respecté", "definition": "Estimé à sa juste valeur.", "advice": "Confier des responsabilités.", "self": "Maintenez vos standards élevés." }
+                ]},
+                { "name": "Fier", "definition": "Estime de soi positive.", "advice": "Reconnaissez le mérite.", "self": "Partagez votre réussite sans fausse modestie.", "children": [
+                    { "name": "Confiant", "definition": "Assurance en ses capacités.", "advice": "Déléguer, faire confiance.", "self": "Faites-vous confiance pour la prochaine étape." },
+                    { "name": "Important", "definition": "Sentiment de valeur.", "advice": "Reconnaître l'impact positif.", "self": "Réalisez que vous comptez pour les autres." }
+                ]},
+                { "name": "Intéressé", "definition": "Attention captivée.", "advice": "Nourrissez cet intérêt.", "self": "Creusez le sujet, apprenez quelque chose.", "children": [
+                    { "name": "Curieux", "definition": "Désir d'apprendre.", "advice": "Répondre aux questions.", "self": "Posez des questions, explorez." },
+                    { "name": "Amusé", "definition": "Divertissement léger.", "advice": "Rire ensemble.", "self": "Riez de bon cœur, c'est bon pour la santé." }
+                ]},
+                { "name": "Joyeux", "definition": "Bonheur vif.", "advice": "Laissez la joie s'exprimer.", "self": "Souriez, sautez, dansez !", "children": [
+                    { "name": "Extasié", "definition": "Joie intense.", "advice": "Partager l'enthousiasme.", "self": "Laissez l'énergie circuler dans tout le corps." },
+                    { "name": "Libéré", "definition": "Soulagement immense.", "advice": "Encourager cette liberté.", "self": "Respirez à pleins poumons, vous êtes libre." }
+                ]}
+            ]},
+            { "name": "Surprise", "color": "#9b59b6", "definition": "Réaction à l'inattendu.", "advice": "Donnez le temps d'assimiler.", "self": "Observez sans juger. Donnez-vous quelques secondes pour atterrir.", "children": [
+                { "name": "Excité", "definition": "Surprise positive stimulante.", "advice": "Canalisez l'énergie.", "self": "Profitez de l'adrénaline, mais restez concentré.", "children": [
+                    { "name": "Energique", "definition": "Surplus de vitalité.", "advice": "Action productive immédiate.", "self": "Bougez, faites du sport ou lancez une action." },
+                    { "name": "Avide", "definition": "Désir impatient.", "advice": "Dévoiler progressivement.", "self": "Savourez l'attente, elle fait partie du plaisir." }
+                ]},
+                { "name": "Etonné", "definition": "Stupéfaction.", "advice": "Confirmez les faits.", "self": "Respirez. Vérifiez ce que vous voyez.", "children": [
+                    { "name": "Effroi", "definition": "Stupéfaction mêlée de peur.", "advice": "Rassurer sur la sécurité.", "self": "Regardez autour de vous pour confirmer la sécurité." },
+                    { "name": "Abasourdi", "definition": "Choc inattendu.", "advice": "Ne pas exiger de réponse immédiate.", "self": "Ne décidez rien maintenant. Attendez." }
+                ]},
+                { "name": "Confus", "definition": "Désorientation mentale.", "advice": "Simplifiez les informations.", "self": "Posez des questions. Ne restez pas dans le flou.", "children": [
+                    { "name": "Perplexe", "definition": "Incompréhension.", "advice": "Reprendre les faits chronologiquement.", "self": "Cherchez la logique, demandez 'pourquoi ?'." },
+                    { "name": "Désillusionné", "definition": "Déception brutale.", "advice": "Aider à reconstruire sur du réel.", "self": "Acceptez que l'image était fausse. La réalité est préférable." }
+                ]},
+                { "name": "Surpris", "definition": "Le choc de l'inattendu.", "advice": "Accueillir la réaction.", "self": "Laissez passer le frisson.", "children": [
+                    { "name": "Consterné", "definition": "Surprise désagréable.", "advice": "Analyser sans blâmer.", "self": "Notez les faits avant de réagir émotionnellement." },
+                    { "name": "Choqué", "definition": "Ébranlement fort.", "advice": "Créer un cocon de calme.", "self": "Asseyez-vous. Buvez de l'eau." }
+                ]}
+            ]},
+            { "name": "Peur", "color": "#8e44ad", "definition": "Anticipation d'un danger.", "advice": "Offrez sécurité et réconfort.", "self": "Ancrage. Sentez vos pieds sur le sol. Respirez lentement par le ventre.", "children": [
+                { "name": "Apeuré", "definition": "Peur directe.", "advice": "Protégez la personne.", "self": "Identifiez la sortie ou la protection. Agissez pour votre sécurité.", "children": [
+                    { "name": "Terrifié", "definition": "Peur paralysante.", "advice": "Prendre le contrôle, être directif.", "self": "Concentrez-vous sur une seule chose : respirer." },
+                    { "name": "Craintif", "definition": "Appréhension.", "advice": "Vérifier ensemble la réalité de la menace.", "self": "Nommez votre peur : 'J'ai peur de...'." }
+                ]},
+                { "name": "Anxieux", "definition": "Inquiétude face à l'avenir.", "advice": "Ramenez l'attention au présent.", "self": "Revenez ici et maintenant. Que se passe-t-il réellement à cette seconde ?", "children": [
+                    { "name": "Accablé", "definition": "Étouffement sous les soucis.", "advice": "Aider à prioriser.", "self": "Une chose à la fois. Faites une liste." },
+                    { "name": "Préoccupé", "definition": "Fixation sur des problèmes futurs.", "advice": "Régler ce qui est possible maintenant.", "self": "Si vous ne pouvez pas agir, lâchez prise." }
+                ]},
+                { "name": "Insécure", "definition": "Vulnérabilité.", "advice": "Renforcez l'estime de soi.", "self": "Rappelez-vous vos forces. Vous êtes capable.", "children": [
+                    { "name": "Incapable", "definition": "Manque de compétence perçu.", "advice": "Proposer de l'aide sans jugement.", "self": "Personne ne sait tout faire. Demander de l'aide est une force." },
+                    { "name": "Inférieur", "definition": "Comparaison défavorable.", "advice": "Valoriser l'unicité.", "self": "Vous avez votre propre chemin, unique." }
+                ]},
+                { "name": "Docile", "definition": "Soumission par peur.", "advice": "Encouragez l'expression.", "self": "Osez dire 'non' ou donner votre avis, même petit.", "children": [
+                    { "name": "Sans valeur", "definition": "Sentiment d'inutilité.", "advice": "Donner de l'importance à son avis.", "self": "Votre existence a de la valeur, intrinsèquement." },
+                    { "name": "Insignifiant", "definition": "Impression d'être invisible.", "advice": "Nommer la personne, la regarder.", "self": "Prenez votre place. Parlez un peu plus fort." }
+                ]},
+                { "name": "Rejeté", "definition": "Peur de l'exclusion.", "advice": "Incluez activement.", "self": "Si ce groupe vous rejette, ce n'est pas le bon groupe pour vous.", "children": [
+                    { "name": "Inadéquat", "definition": "Ne pas 'fitter' dans le moule.", "advice": "Souligner que la diversité est une force.", "self": "Soyez vous-même, les autres s'adapteront." },
+                    { "name": "Exclus", "definition": "Mis à l'écart.", "advice": "Faire le pont avec le groupe.", "self": "Cherchez des alliés ailleurs." }
+                ]},
+                { "name": "Humilié", "definition": "Atteinte à la dignité.", "advice": "Restaurez la dignité.", "self": "Redressez la tête. L'humiliation parle de celui qui humilie, pas de vous.", "children": [
+                    { "name": "Non respecté", "definition": "Limites bafouées.", "advice": "S'excuser ou défendre la personne.", "self": "Rappelez fermement votre limite." },
+                    { "name": "Ridiculisé", "definition": "Honte par moquerie.", "advice": "Ne jamais rire avec les moqueurs.", "self": "Quittez la pièce avec dignité." }
+                ]}
+            ]}
+        ]
+    };
+
+    const rawDataEn = {
+        "name": "Emotions", "color": "#ffffff", "children": [
+            { "name": "Anger", "color": "#e74c3c", "definition": "Strong reaction to frustration or threat.", "advice": "Do not respond with aggression. Listen without interrupting.", "self": "Pause (Stop). Do not react in the heat of the moment. Breathe to lower tension.", "children": [
+                { "name": "Hurt", "definition": "Pain turned into hostility.", "advice": "Address the pain hidden behind the anger.", "self": "Acknowledge that you are hurting. Don't mask pain with attack.", "children": [
+                    { "name": "Embarrassed", "definition": "Intense shame or awkwardness.", "advice": "Do not dwell on the fault. Reassure their value.", "self": "Be kind to yourself. Everyone makes mistakes." },
+                    { "name": "Devastated", "definition": "Emotional shock after trauma.", "advice": "Offer a calm and stable presence.", "self": "Seek a safe place. Ask for support immediately." }
+                ]},
+                { "name": "Threatened", "definition": "Defense against perceived danger.", "advice": "Restore a sense of safety.", "self": "Check: is the danger real or assumed? Find your footing.", "children": [
+                    { "name": "Insecure", "definition": "Lack of confidence due to instability.", "advice": "Create a predictable environment.", "self": "List your skills and past successes to reassure yourself." },
+                    { "name": "Jealous", "definition": "Fear of losing a bond or advantage.", "advice": "Reassure the importance of the unique relationship.", "self": "Express your need for attention without accusing." }
+                ]},
+                { "name": "Hateful", "definition": "Deep and lasting hostility.", "advice": "Set firm boundaries without taking it personally.", "self": "Hate poisons you more than the other. Let go for your own sake.", "children": [
+                    { "name": "Bitter", "definition": "Resentment from past injustices.", "advice": "Acknowledge the past, but invite action in the present.", "self": "Write down what you can't forgive, then burn the paper." },
+                    { "name": "Defiant", "definition": "Active opposition to authority.", "advice": "Offer choices to restore a sense of control.", "self": "Pick your battles. Is this struggle worth it?" }
+                ]},
+                { "name": "Mad", "definition": "Active state of irritation.", "advice": "Let the storm pass.", "self": "Say 'I am angry' and go for a 5-minute walk.", "children": [
+                    { "name": "Furious", "definition": "Extreme and explosive agitation.", "advice": "Keep distance, wait for calm.", "self": "Physically step away to avoid breaking things or relationships." },
+                    { "name": "Enraged", "definition": "Total loss of control.", "advice": "Prioritize safety. Break contact temporarily.", "self": "Emergency: isolate yourself. Breathe deeply counting to 10." }
+                ]},
+                { "name": "Aggressive", "definition": "Verbal or physical hostility.", "advice": "Secure the space. Be firm.", "self": "Channel this energy into intense physical activity.", "children": [
+                    { "name": "Provoking", "definition": "Seeking to trigger a reaction.", "advice": "Don't take the bait. Stick to facts.", "self": "Ask yourself: what need for attention are you trying to fill?" },
+                    { "name": "Hostile", "definition": "Declared enmity.", "advice": "Set clear boundaries without aggression.", "self": "Try to see the humanity in the other person." }
+                ]},
+                { "name": "Frustrated", "definition": "Tension from inability to act.", "advice": "Look for an alternative to the obstacle.", "self": "Accept that not everything is under your control. Shift perspective.", "children": [
+                    { "name": "Infuriated", "definition": "Exasperation from repeated obstacles.", "advice": "Propose an alternative method.", "self": "Take a radical break. Come back to the problem later." },
+                    { "name": "Irritated", "definition": "Annoyance from unpleasant situation.", "advice": "Reduce stimuli (noise, pressure).", "self": "Identify the 'pebble in the shoe' and remove it." }
+                ]},
+                { "name": "Distant", "definition": "Break in emotional connection.", "advice": "Respect distance while remaining available.", "self": "Take this time to recharge, but give a return time.", "children": [
+                    { "name": "Withdrawn", "definition": "Retreating to protect oneself.", "advice": "Respect the need for silence.", "self": "Enjoy solitude to sort out your thoughts." },
+                    { "name": "Suspicious", "definition": "Distrust of others' intentions.", "advice": "Be transparent and consistent.", "self": "Look for factual evidence before judging intentions." }
+                ]},
+                { "name": "Critical", "definition": "Negative judgment attitude.", "advice": "Ask for factual clarifications.", "self": "Turn your critical eye toward the solution, not the person.", "children": [
+                    { "name": "Skeptical", "definition": "Doubt about truthfulness.", "advice": "Provide concrete and logical data.", "self": "Stay open to the possibility of being surprised." },
+                    { "name": "Sarcastic", "definition": "Biting irony expressing contempt.", "advice": "Respond to the underlying serious message.", "self": "Say what you really think, without the mask of humor." }
+                ]}
+            ]},
+            { "name": "Disgust", "color": "#27ae60", "definition": "Rejection of something harmful.", "advice": "Don't force acceptance. Validate the rejection.", "self": "Listen to your body. If it's a 'no', it's a 'no'.", "children": [
+                { "name": "Disapproval", "definition": "Firm objection.", "advice": "Listen to the judgment criteria.", "self": "Clarify which personal value has been violated.", "children": [
+                    { "name": "Judgmental", "definition": "Negative moral evaluation.", "advice": "Bring discussion back to observable facts.", "self": "Try to understand the other's context before condemning." },
+                    { "name": "Loathing", "definition": "Repulsion and desire to distance.", "advice": "Do not force proximity.", "self": "Respect your need for space." }
+                ]},
+                { "name": "Disappointed", "definition": "Reality below expectations.", "advice": "Allow expression of disappointment.", "self": "Adjust your expectations for the future. Accept reality as it is.", "children": [
+                    { "name": "Repugnant", "definition": "Deep physical or moral disgust.", "advice": "Remove the source of disgust if possible.", "self": "Leave the situation. Protect your integrity." },
+                    { "name": "Revolted", "definition": "Moral indignation at injustice.", "advice": "Ally in indignation to take action.", "self": "Transform this energy into constructive action." }
+                ]},
+                { "name": "Awful", "definition": "Feeling of horror.", "advice": "Offer an immediate change of context.", "self": "Ground yourself in the present (breathing, touch) to avoid panic.", "children": [
+                    { "name": "Nauseated", "definition": "Physical or psychological nausea.", "advice": "Offer fresh air or a break.", "self": "Drink water, get some fresh air." },
+                    { "name": "Detestable", "definition": "Hostility towards the odious.", "advice": "Listen to allow emotional purging.", "self": "Don't keep this inside, talk to someone you trust." }
+                ]},
+                { "name": "Avoidance", "definition": "Withdrawing from the object.", "advice": "Facilitate leaving the situation.", "self": "It is okay to leave if the situation is toxic.", "children": [
+                    { "name": "Averse", "definition": "Active will to flee.", "advice": "Do not block the exit.", "self": "Put physical distance between you and it quickly." },
+                    { "name": "Hesitant", "definition": "Uncertainty and restraint.", "advice": "Encourage gently, step by step.", "self": "Don't force yourself. Take time to observe." }
+                ]}
+            ]},
+            { "name": "Sadness", "color": "#3498db", "definition": "Pain related to loss or lack.", "advice": "Empathy and presence. Don't 'fix' it too fast.", "self": "Welcome the pain. Crying releases stress hormones.", "children": [
+                { "name": "Guilty", "definition": "Feeling of having done wrong.", "advice": "Help distinguish true responsibility.", "self": "Apologize if needed, then forgive yourself. Self-flagellation helps no one.", "children": [
+                    { "name": "Remorseful", "definition": "Pain from acting badly.", "advice": "Encourage reparation or forgiveness.", "self": "What concrete action can you take to repair?" },
+                    { "name": "Ashamed", "definition": "Feeling of unworthiness.", "advice": "Separate the act from the person's identity.", "self": "You are not your mistake. You are worthy." }
+                ]},
+                { "name": "Abandoned", "definition": "Being left alone without support.", "advice": "Actively show you are there.", "self": "Become your own best friend. Self-soothe (bath, reading).", "children": [
+                    { "name": "Ignored", "definition": "Lack of received attention.", "advice": "Establish eye contact and listen.", "self": "Express: 'I need to be listened to'." },
+                    { "name": "Victimized", "definition": "Fear of an overwhelming situation.", "advice": "Soften voice, simplify stakes.", "self": "Visualize yourself strong and capable. Stand tall." }
+                ]},
+                { "name": "Despair", "definition": "Total loss of hope.", "advice": "Be a stable pillar. Concrete help.", "self": "Don't look at the mountain, just look at the next step.", "children": [
+                    { "name": "Powerless", "definition": "Belief of inability to act.", "advice": "Find a 'micro-action' doable now.", "self": "Do one tiny task (e.g., wash a dish) to regain power." },
+                    { "name": "Vulnerable", "definition": "Fragile state without defense.", "advice": "Offer unconditional kindness.", "self": "Accept being fragile temporarily. It's human." }
+                ]},
+                { "name": "Depressed", "definition": "Low mood and energy.", "advice": "Patience. Do not judge low energy.", "self": "Be gentle. Set no high goals for today.", "children": [
+                    { "name": "Inferior", "definition": "Belief of being below others.", "advice": "List factual past successes.", "self": "Stop social media comparisons." },
+                    { "name": "Empty", "definition": "Absence of emotion, loss of meaning.", "advice": "Be present silently.", "self": "Reconnect to senses: touch, smell, taste." }
+                ]},
+                { "name": "Lonely", "definition": "Pain of isolation.", "advice": "Shared moments without pressure.", "self": "Call a loved one or go to a public place (cafe, park).", "children": [
+                    { "name": "Forsaken", "definition": "Left behind by loved ones.", "advice": "Verbalize: 'I am here for you'.", "self": "Remember those who love you, even if they are far." },
+                    { "name": "Isolated", "definition": "Lack of social connection.", "advice": "Propose gentle inclusion.", "self": "Make a small gesture towards someone (smile, text)." }
+                ]},
+                { "name": "Bored", "definition": "Lack of interest and stimulation.", "advice": "Change setting or find meaning.", "self": "Explore something new or move your body.", "children": [
+                    { "name": "Apathetic", "definition": "Total lack of energy.", "advice": "Don't rush. Wait.", "self": "Rest truly, without screens." },
+                    { "name": "Indifferent", "definition": "Disinterest in the present.", "advice": "Find what actually matters to them.", "self": "Ask yourself: 'What would excite me right now?'" }
+                ]}
+            ]},
+            { "name": "Joy", "color": "#f1c40f", "definition": "State of satisfaction and pleasure.", "advice": "Celebrate and anchor this feeling!", "self": "Enjoy! Anchor this moment in your memory.", "children": [
+                { "name": "Optimistic", "definition": "Positive confidence in the future.", "advice": "Feed this momentum to start projects.", "self": "Write down your ideas now, you are creative!", "children": [
+                    { "name": "Inspired", "definition": "Creative momentum.", "advice": "Encourage brainstorming.", "self": "Create something, anything, right now." },
+                    { "name": "Open", "definition": "Acceptance of novelty.", "advice": "Propose changes.", "self": "Say 'yes' to an opportunity today." }
+                ]},
+                { "name": "Intimate", "definition": "Warm proximity.", "advice": "Use this to strengthen the bond.", "self": "Be authentic, drop the mask.", "children": [
+                    { "name": "Playful", "definition": "Desire to play.", "advice": "Use humor.", "self": "Have fun, don't take anything seriously." },
+                    { "name": "Sensitive", "definition": "Soft emotional openness.", "advice": "Speak from the heart.", "self": "Appreciate this fine connection with others or nature." }
+                ]},
+                { "name": "Peaceful", "definition": "Serenity and calm.", "advice": "Preserve this atmosphere.", "self": "Sustain this state through slow breathing.", "children": [
+                    { "name": "Hopeful", "definition": "Serene confidence.", "advice": "Validate that 'all will be well'.", "self": "Cultivate this positive vision." },
+                    { "name": "Loving", "definition": "Warmth towards others.", "advice": "Welcome this affection.", "self": "Express your gratitude or love." }
+                ]},
+                { "name": "Powerful", "definition": "Personal power.", "advice": "Encourage autonomy.", "self": "Use this strength to move forward on a tough topic.", "children": [
+                    { "name": "Provocative", "definition": "Bold desire to challenge.", "advice": "Channel into an ambitious project.", "self": "Challenge the status quo constructively." },
+                    { "name": "Courageous", "definition": "Ability to face fear.", "advice": "Value bravery.", "self": "Go for it, now is the time to act." }
+                ]},
+                { "name": "Accepted", "definition": "Belonging and validation.", "advice": "Reinforce integration.", "self": "Savor the feeling of belonging.", "children": [
+                    { "name": "Fulfilled", "definition": "Satisfaction of done duty.", "advice": "Congratulate specifically.", "self": "Take a moment to tell yourself 'Well done'." },
+                    { "name": "Respected", "definition": "Valued correctly.", "advice": "Entrust with responsibilities.", "self": "Maintain your high standards." }
+                ]},
+                { "name": "Proud", "definition": "Positive self-esteem.", "advice": "Recognize merit.", "self": "Share your success without false modesty.", "children": [
+                    { "name": "Confident", "definition": "Assurance in capabilities.", "advice": "Delegate, trust.", "self": "Trust yourself for the next step." },
+                    { "name": "Important", "definition": "Feeling of value.", "advice": "Recognize positive impact.", "self": "Realize that you matter to others." }
+                ]},
+                { "name": "Interested", "definition": "Captivated attention.", "advice": "Feed this interest.", "self": "Dig deeper, learn something.", "children": [
+                    { "name": "Curious", "definition": "Desire to learn.", "advice": "Answer questions.", "self": "Ask questions, explore." },
+                    { "name": "Amused", "definition": "Light entertainment.", "advice": "Laugh together.", "self": "Laugh heartily, it's healthy." }
+                ]},
+                { "name": "Happy", "definition": "Vivid happiness.", "advice": "Let joy express itself.", "self": "Smile, jump, dance!", "children": [
+                    { "name": "Ecstatic", "definition": "Intense joy.", "advice": "Share enthusiasm.", "self": "Let the energy flow through your body." },
+                    { "name": "Liberated", "definition": "Immense relief.", "advice": "Encourage this freedom.", "self": "Breathe fully, you are free." }
+                ]}
+            ]},
+            { "name": "Surprise", "color": "#9b59b6", "definition": "Reaction to the unexpected.", "advice": "Give time to assimilate.", "self": "Observe without judging. Give yourself seconds to land.", "children": [
+                { "name": "Excited", "definition": "Stimulating positive surprise.", "advice": "Channel the energy.", "self": "Enjoy the adrenaline, but stay focused.", "children": [
+                    { "name": "Energetic", "definition": "Surplus of vitality.", "advice": "Immediate productive action.", "self": "Move, do sports or start an action." },
+                    { "name": "Eager", "definition": "Impatient desire.", "advice": "Reveal gradually.", "self": "Savor the anticipation, it's part of the fun." }
+                ]},
+                { "name": "Amazed", "definition": "Astonishment.", "advice": "Confirm facts.", "self": "Breathe. Verify what you are seeing.", "children": [
+                    { "name": "Awestruck", "definition": "Astonishment mixed with fear.", "advice": "Reassure on safety.", "self": "Look around to confirm safety." },
+                    { "name": "Astonished", "definition": "Unexpected shock.", "advice": "Do not demand immediate answer.", "self": "Don't decide anything now. Wait." }
+                ]},
+                { "name": "Confused", "definition": "Mental disorientation.", "advice": "Simplify information.", "self": "Ask questions. Don't stay in the blur.", "children": [
+                    { "name": "Perplexed", "definition": "Misunderstanding.", "advice": "Review facts chronologically.", "self": "Seek logic, ask 'why?'." },
+                    { "name": "Disillusioned", "definition": "Brutal disappointment.", "advice": "Help rebuild on reality.", "self": "Accept the image was false. Reality is better." }
+                ]},
+                { "name": "Startled", "definition": "Shock of the unexpected.", "advice": "Welcome the reaction.", "self": "Let the shiver pass.", "children": [
+                    { "name": "Dismayed", "definition": "Unpleasant surprise.", "advice": "Analyze without blaming.", "self": "Note facts before reacting emotionally." },
+                    { "name": "Shocked", "definition": "Strong shaking.", "advice": "Create a calm cocoon.", "self": "Sit down. Drink water." }
+                ]}
+            ]},
+            { "name": "Fear", "color": "#8e44ad", "definition": "Anticipation of danger.", "advice": "Offer safety and comfort.", "self": "Grounding. Feel your feet on the floor. Breathe slowly.", "children": [
+                { "name": "Scared", "definition": "Direct fear.", "advice": "Protect the person.", "self": "Identify the exit or protection. Act for your safety.", "children": [
+                    { "name": "Terrified", "definition": "Paralyzing fear.", "advice": "Take control, be directive.", "self": "Focus on one thing: breathing." },
+                    { "name": "Fearful", "definition": "Apprehension.", "advice": "Check reality of threat together.", "self": "Name your fear: 'I am afraid of...'." }
+                ]},
+                { "name": "Anxious", "definition": "Worry about future.", "advice": "Bring attention to present.", "self": "Come back to here and now. What is truly happening this second?", "children": [
+                    { "name": "Overwhelmed", "definition": "Suffocating under worries.", "advice": "Help prioritize.", "self": "One thing at a time. Make a list." },
+                    { "name": "Worried", "definition": "Fixation on future problems.", "advice": "Fix what is possible now.", "self": "If you can't act, let go." }
+                ]},
+                { "name": "Insecure", "definition": "Vulnerability.", "advice": "Strengthen self-esteem.", "self": "Remember your strengths. You are capable.", "children": [
+                    { "name": "Inadequate", "definition": "Perceived lack of skill.", "advice": "Offer help without judgment.", "self": "No one knows everything. Asking for help is strength." },
+                    { "name": "Inferior", "definition": "Unfavorable comparison.", "advice": "Value uniqueness.", "self": "You have your own unique path." }
+                ]},
+                { "name": "Submissive", "definition": "Submission by fear.", "advice": "Encourage expression.", "self": "Dare to say 'no' or give your opinion, even small.", "children": [
+                    { "name": "Worthless", "definition": "Feeling useless.", "advice": "Give importance to their opinion.", "self": "Your existence has value, intrinsically." },
+                    { "name": "Insignificant", "definition": "Feeling invisible.", "advice": "Name the person, look at them.", "self": "Take your space. Speak a bit louder." }
+                ]},
+                { "name": "Rejected", "definition": "Fear of exclusion.", "advice": "Include actively.", "self": "If this group rejects you, it's not the right group.", "children": [
+                    { "name": "Inadequate", "definition": "Not fitting the mold.", "advice": "Highlight diversity as strength.", "self": "Be yourself, others will adapt." },
+                    { "name": "Excluded", "definition": "Left out.", "advice": "Bridge with the group.", "self": "Look for allies elsewhere." }
+                ]},
+                { "name": "Humiliated", "definition": "Attack on dignity.", "advice": "Restore dignity.", "self": "Chin up. Humiliation speaks of the humiliator, not you.", "children": [
+                    { "name": "Disrespected", "definition": "Boundaries violated.", "advice": "Apologize or defend the person.", "self": "Firmly state your boundary." },
+                    { "name": "Ridiculed", "definition": "Shame by mockery.", "advice": "Never laugh with mockers.", "self": "Leave the room with dignity." }
+                ]}
+            ]}
+        ]
+    };
+
+    // ==========================================
+    // 2. STATIC UI TRANSLATIONS
+    // ==========================================
+
+    const translations = {
+        fr: {
+            "default-msg": "Survolez la roue pour voir les détails complets.",
+            "lbl-definition": "Définition",
+            "lbl-advice": "Conseil Relationnel (Gérer l'Autre) 🤝",
+            "lbl-self-advice": "Auto-Régulation (Se Gérer Soi) 🧘",
+            "title-defense": "🛡️ Mécanismes de défense",
+            "def-fight": "La défense par l'attaque",
+            "def-flight": "La défense par la fuite",
+            "def-freeze": "La défense par la sidération ou le stoïcisme",
+            "brain-note": "<strong>Note :</strong> Quel que soit le mécanisme, il existe environ <strong>une minute</strong> où le cerveau n'est plus capable de rien faire (l'énergie fuit le cerveau pour aller dans les jambes).",
+            "title-feedback": "💬 Mécanique du Feedback",
+            "fb-step-a": "<u>Caméra d'observation</u> (Capter les faits)<span class='example'>Ex: \"Tu réponds à ma place\"</span>",
+            "fb-step-b": "<u>Partage des sentiments/émotions</u><span class='example'>Ex: \"Je ne me sens pas respecté, je me sens effacé et cela me frustre\"</span>",
+            "fb-step-c": "<u>Par conséquent</u> (Impact ?)<span class='example'>Ex: \"Je ne viens pas aux réunions / tu diminues mon engagement\"</span>",
+            "fb-step-d": "<strong><u>Silence</u></strong><span class='example'>Ne pas noyer le poisson. Permet à l'autre de réaliser et de répondre.</span>"
+        },
+        en: {
+            "default-msg": "Hover over the wheel to see full details.",
+            "lbl-definition": "Definition",
+            "lbl-advice": "Relational Advice (Handling Others) 🤝",
+            "lbl-self-advice": "Self-Regulation (Handling Self) 🧘",
+            "title-defense": "🛡️ Defense Mechanisms",
+            "def-fight": "Defense by attacking",
+            "def-flight": "Defense by fleeing",
+            "def-freeze": "Defense by freezing or stoicism",
+            "brain-note": "<strong>Note:</strong> Regardless of the mechanism, there is about <strong>one minute</strong> where the brain cannot process anything (energy flees the brain to go to the legs).",
+            "title-feedback": "💬 Feedback Mechanics",
+            "fb-step-a": "<u>Observation Camera</u> (Capture facts)<span class='example'>Ex: \"You answer instead of me\"</span>",
+            "fb-step-b": "<u>Share feelings/emotions</u><span class='example'>Ex: \"I don't feel respected, I feel erased and it frustrates me\"</span>",
+            "fb-step-c": "<u>Consequently</u> (Impact?)<span class='example'>Ex: \"I won't attend meetings / you reduce my engagement\"</span>",
+            "fb-step-d": "<strong><u>Silence</u></strong><span class='example'>Don't drown the fish. Allow the other to realize and respond.</span>"
+        }
+    };
+
+    // ==========================================
+    // 3. MAIN LOGIC
+    // ==========================================
+
+    let currentLang = 'fr';
+
+    function init() {
+        // Detect browser language
+        const browserLang = navigator.language || navigator.userLanguage;
+        if (browserLang.startsWith('en')) {
+            currentLang = 'en';
+        } else {
+            currentLang = 'fr';
+        }
+        
+        // Set selector
+        document.getElementById('lang-select').value = currentLang;
+        
+        // Initial Draw
+        applyLanguage(currentLang);
+    }
+
+    function changeLanguage(lang) {
+        currentLang = lang;
+        applyLanguage(lang);
+    }
+
+    function applyLanguage(lang) {
+        document.documentElement.lang = lang;
+        
+        // 1. Update Static Text
+        const t = translations[lang];
+        for (const [id, html] of Object.entries(t)) {
+            const el = document.getElementById(id);
+            if(el) el.innerHTML = html;
+        }
+
+        // 2. Select Data
+        const data = (lang === 'fr') ? rawDataFr : rawDataEn;
+
+        // 3. Redraw D3 Chart
+        drawChart(data);
+        
+        // 4. Reset Panel
+        resetPanel();
+    }
+
+    function resetPanel() {
+        document.getElementById('default-msg').style.display = 'block';
+        document.getElementById('details').style.display = 'none';
+        document.getElementById('dynamic-panel').style.borderLeftColor = "#ccc";
+    }
+
+    // --- D3 DRAWING FUNCTION ---
+    function drawChart(data) {
+        // Clear previous chart
+        d3.select("#chart-column").selectAll("*").remove();
+
+        // Responsive Dimensions
+        const chartDiv = document.getElementById('chart-column');
+        const containerWidth = chartDiv.clientWidth;
+        const containerHeight = chartDiv.clientHeight;
+        
+        // Use the smaller dimension to keep it circular and contained
+        const size = Math.min(containerWidth, containerHeight, 700); 
+        const radius = size / 6;
+
+        const hierarchy = d3.hierarchy(data)
+            .sum(d => 1)
+            .sort((a, b) => b.value - a.value);
+
+        const partition = d3.partition()
+            .size([2 * Math.PI, radius * 3]);
+
+        const root = partition(hierarchy);
+
+        const arc = d3.arc()
+            .startAngle(d => d.x0)
+            .endAngle(d => d.x1)
+            .padAngle(0) 
+            .innerRadius(d => d.y0)
+            .outerRadius(d => d.y1);
+
+        const svg = d3.select("#chart-column")
+            .append("svg")
+            .attr("viewBox", [-size / 2, -size / 2, size, size])
+            .style("max-width", "100%")
+            .style("height", "auto")
+            .style("font", "10px sans-serif");
+
+        const getColor = (d) => {
+            let c;
+            if (d.data.color) c = d.data.color;
+            else {
+                let parent = d.parent;
+                while(parent && !parent.data.color) parent = parent.parent;
+                c = parent ? parent.data.color : "#ccc";
+            }
+            if(d.depth === 2) return d3.color(c).brighter(0.5); 
+            if(d.depth === 3) return d3.color(c).brighter(1);
+            return c;
+        };
+
+        const path = svg.append("g")
+            .selectAll("path")
+            .data(root.descendants().slice(1))
+            .join("path")
+            .attr("fill", d => getColor(d))
+            .attr("d", arc);
+
+        svg.append("g")
+            .attr("pointer-events", "none")
+            .selectAll("text")
+            .data(root.descendants().slice(1))
+            .join("text")
+            .attr("transform", function(d) {
+                const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
+                const y = (d.y0 + d.y1) / 2;
+                return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
+            })
+            .attr("dy", "0.35em")
+            .attr("fill", d => d.depth >= 2 ? "#333" : "#fff")
+            .style("font-size", d => {
+                 if(d.depth === 3) return (size < 500) ? "7px" : "9px";
+                 return (size < 500) ? "9px" : "11px";
+            })
+            .text(d => d.data.name);
+
+        // Events
+        const dynamicPanel = document.getElementById('dynamic-panel');
+        const defaultMsg = document.getElementById('default-msg');
+        const details = document.getElementById('details');
+        
+        const titleEl = document.getElementById('emotion-title');
+        const defEl = document.getElementById('emotion-def');
+        const adviceEl = document.getElementById('emotion-advice');
+        const selfAdviceEl = document.getElementById('emotion-self-advice');
+
+        path.on("mouseenter", function(event, d) {
+            d3.selectAll("path").style("opacity", 0.3);
+            const sequence = d.ancestors().reverse();
+            svg.selectAll("path")
+                .filter(node => sequence.indexOf(node) >= 0)
+                .style("opacity", 1);
+                
+            defaultMsg.style.display = 'none';
+            details.style.display = 'block';
+            
+            let activeColor = d3.select(this).attr("fill");
+            dynamicPanel.style.borderLeftColor = activeColor;
+            
+            titleEl.textContent = d.data.name;
+            titleEl.style.color = d3.color(activeColor).darker(1);
+            
+            // Translations fallbacks
+            const fallbackDef = currentLang === 'fr' ? "Description non disponible." : "Description not available.";
+            const fallbackAdv = currentLang === 'fr' ? "Conseil non disponible." : "Advice not available.";
+            const fallbackSelf = currentLang === 'fr' ? "Prenez un temps de respiration." : "Take a moment to breathe.";
+
+            defEl.textContent = d.data.definition || fallbackDef;
+            adviceEl.textContent = d.data.advice || fallbackAdv;
+            selfAdviceEl.textContent = d.data.self || fallbackSelf;
+        });
+
+        d3.select("#chart-column").on("mouseleave", function() {
+            d3.selectAll("path").style("opacity", 1);
+            resetPanel();
+        });
+    }
+
+    // Handle Resize for Responsiveness
+    window.addEventListener('resize', () => {
+         const data = (currentLang === 'fr') ? rawDataFr : rawDataEn;
+         drawChart(data);
+    });
+
+    // Start
+    init();
+
+</script>
+</body>
+</html>
